@@ -1,17 +1,30 @@
-﻿using System.Configuration;
+﻿﻿using System.Configuration;
 using System.Data;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
+using System.Threading;
 
 namespace MyDesktopOrganizer;
 
 public partial class App : Application
 {
     private NativeTrayIcon? _trayIcon;
+    private static Mutex? _mutex;
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        const string appName = "MyDesktopOrganizer_Unique_Instance";
+        bool createdNew;
+        _mutex = new Mutex(true, appName, out createdNew);
+
+        if (!createdNew)
+        {
+            MessageBox.Show("La aplicación ya se está ejecutando.\nRevisa la bandeja del sistema (ícono junto al reloj).", "MyDesktopOrganizer", MessageBoxButton.OK, MessageBoxImage.Information);
+            Shutdown();
+            return;
+        }
+
         base.OnStartup(e);
         MyDesktopOrganizer.MainWindow.LoadLayout();
         
