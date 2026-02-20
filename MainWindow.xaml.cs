@@ -327,6 +327,10 @@ namespace MyDesktopOrganizer
 
             if (Directory.Exists(StorageFolderPath))
             {
+                foreach (var dir in Directory.GetDirectories(StorageFolderPath))
+                {
+                    AddFileIcon(dir);
+                }
                 foreach (var file in Directory.GetFiles(StorageFolderPath))
                 {
                     AddFileIcon(file);
@@ -348,15 +352,26 @@ namespace MyDesktopOrganizer
                             string fileName = Path.GetFileName(file);
                             string destPath = Path.Combine(StorageFolderPath, fileName);
 
-                            int count = 1;
-                            while (File.Exists(destPath))
+                            if (Directory.Exists(file))
                             {
-                                string nameNoExt = Path.GetFileNameWithoutExtension(fileName);
-                                string ext = Path.GetExtension(fileName);
-                                destPath = Path.Combine(StorageFolderPath, $"{nameNoExt} ({count++}){ext}");
+                                int count = 1;
+                                while (Directory.Exists(destPath) || File.Exists(destPath))
+                                {
+                                    destPath = Path.Combine(StorageFolderPath, $"{fileName} ({count++})");
+                                }
+                                Directory.Move(file, destPath);
                             }
-
-                            File.Move(file, destPath);
+                            else
+                            {
+                                int count = 1;
+                                while (File.Exists(destPath) || Directory.Exists(destPath))
+                                {
+                                    string nameNoExt = Path.GetFileNameWithoutExtension(fileName);
+                                    string ext = Path.GetExtension(fileName);
+                                    destPath = Path.Combine(StorageFolderPath, $"{nameNoExt} ({count++}){ext}");
+                                }
+                                File.Move(file, destPath);
+                            }
                         }
                         catch {  }
                     }
@@ -370,6 +385,22 @@ namespace MyDesktopOrganizer
             string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
             if (Directory.Exists(StorageFolderPath))
             {
+                foreach (var dir in Directory.GetDirectories(StorageFolderPath))
+                {
+                    try
+                    {
+                        string dirName = Path.GetFileName(dir);
+                        string destPath = Path.Combine(desktopPath, dirName);
+
+                        int count = 1;
+                        while (Directory.Exists(destPath) || File.Exists(destPath))
+                        {
+                            destPath = Path.Combine(desktopPath, $"{dirName} ({count++})");
+                        }
+                        Directory.Move(dir, destPath);
+                    }
+                    catch { }
+                }
                 foreach (var file in Directory.GetFiles(StorageFolderPath))
                 {
                     try
@@ -378,7 +409,7 @@ namespace MyDesktopOrganizer
                         string destPath = Path.Combine(desktopPath, fileName);
 
                         int count = 1;
-                        while (File.Exists(destPath))
+                        while (File.Exists(destPath) || Directory.Exists(destPath))
                         {
                             string nameNoExt = Path.GetFileNameWithoutExtension(fileName);
                             string ext = Path.GetExtension(fileName);
@@ -453,7 +484,7 @@ namespace MyDesktopOrganizer
             {
                 TextBlock nameBlock = new TextBlock
                 {
-                    Text = Path.GetFileNameWithoutExtension(filePath),
+                    Text = Directory.Exists(filePath) ? Path.GetFileName(filePath) : Path.GetFileNameWithoutExtension(filePath),
                     Foreground = Brushes.White,
                     TextAlignment = TextAlignment.Center,
                     TextTrimming = TextTrimming.CharacterEllipsis,
