@@ -24,6 +24,7 @@ DefaultDirName={userpf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 PrivilegesRequired=lowest
 OutputBaseFilename=Instalador_MyDesktopOrganizer
+OutputDir=Output
 SetupIconFile=MyDesktopOrganizer.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 
