@@ -1,0 +1,37 @@
+# Visual Studio y .NET
+.vs/
+bin/
+obj/
+Output/*
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+
+# Archivos temporales de Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Paquetes Nuget (si no quieres subirlos)
+packages/
+
+# Archivos de publicación
+*.publishsettings
+
+# Visual Studio Code (si lo usas a veces)
+.vscode/
+
+# Archivos de log
+*.log
+
+# Layout guardado localmente (para no sobrescribir el de otros usuarios)
+layout.json
