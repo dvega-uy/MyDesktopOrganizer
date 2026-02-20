@@ -733,7 +733,12 @@ namespace MyDesktopOrganizer
             GetClassName(hWnd, className, className.Capacity);
             string name = className.ToString();
             
-            return name == "SysListView32" || name == "Progman" || name == "WorkerW" || name == "SHELLDLL_DefView";
+            if (name == "SysListView32")
+            {
+                return !IsIconUnderMouse(hWnd, pt);
+            }
+
+            return name == "Progman" || name == "WorkerW" || name == "SHELLDLL_DefView";
         }
 
         private static void ToggleDesktopIcons()
@@ -857,11 +862,53 @@ namespace MyDesktopOrganizer
         [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr hWnd);
         [DllImport("user32.dll")] private static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
 
+        [DllImport("user32.dll")] private static extern bool ScreenToClient(IntPtr hWnd, ref POINT lpPoint);
+        [DllImport("user32.dll")] private static extern int GetWindowThreadProcessId(IntPtr hWnd, out int lpdwProcessId);
+        [DllImport("kernel32.dll")] private static extern IntPtr OpenProcess(int dwDesiredAccess, bool bInheritHandle, int dwProcessId);
+        [DllImport("kernel32.dll")] private static extern IntPtr VirtualAllocEx(IntPtr hProcess, IntPtr lpAddress, uint dwSize, uint flAllocationType, uint flProtect);
+        [DllImport("kernel32.dll")] private static extern bool WriteProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, IntPtr lpBuffer, uint nSize, out int lpNumberOfBytesWritten);
+        [DllImport("kernel32.dll")] private static extern bool VirtualFreeEx(IntPtr hProcess, IntPtr lpAddress, uint dwSize, uint dwFreeType);
+        [DllImport("kernel32.dll")] private static extern bool CloseHandle(IntPtr hObject);
+        [DllImport("user32.dll")] private static extern int SendMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+        private static bool IsIconUnderMouse(IntPtr hWnd, POINT pt)
+        {
+            ScreenToClient(hWnd, ref pt);
+            GetWindowThreadProcessId(hWnd, out int processId);
+            IntPtr hProcess = OpenProcess(0x0038, false, processId);
+            if (hProcess == IntPtr.Zero) return false;
+
+            uint size = (uint)Marshal.SizeOf(typeof(LVHITTESTINFO));
+            IntPtr memPtr = VirtualAllocEx(hProcess, IntPtr.Zero, size, 0x1000, 0x04);
+            if (memPtr == IntPtr.Zero) { CloseHandle(hProcess); return false; }
+
+            LVHITTESTINFO hitInfo = new LVHITTESTINFO { pt = pt };
+            IntPtr localPtr = Marshal.AllocHGlobal((int)size);
+            Marshal.StructureToPtr(hitInfo, localPtr, false);
+            WriteProcessMemory(hProcess, memPtr, localPtr, size, out _);
+            Marshal.FreeHGlobal(localPtr);
+
+            int result = SendMessage(hWnd, 0x1012, IntPtr.Zero, memPtr); // LVM_HITTEST
+            VirtualFreeEx(hProcess, memPtr, 0, 0x8000);
+            CloseHandle(hProcess);
+            return result != -1;
+        }
+
         private const int WS_EX_LAYERED = 0x80000;
         private const int LWA_ALPHA = 0x2;
 
         [StructLayout(LayoutKind.Sequential)]
         public struct POINT { public int x; public int y; }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct LVHITTESTINFO
+        {
+            public POINT pt;
+            public uint flags;
+            public int iItem;
+            public int iSubItem;
+            public int iGroup;
+        }
 
         [StructLayout(LayoutKind.Sequential)]
         private struct MSLLHOOKSTRUCT { public POINT pt; public uint mouseData; public uint flags; public uint time; public IntPtr dwExtraInfo; }
