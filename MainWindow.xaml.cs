@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿﻿﻿﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -29,6 +29,7 @@ namespace MyDesktopOrganizer
         public static Color GlobalColor = Color.FromRgb(16, 16, 16);
         public static bool GlobalShowFileName = true;
         public static bool GlobalShowShortcutSymbol = true;
+        public static bool EnableGameMode = false;
 
         public string BoxId { get; private set; }
         private static bool _areBoxesHidden = false;
@@ -45,6 +46,8 @@ namespace MyDesktopOrganizer
         public bool ShowFileName { get; private set; } = true;
         public bool ShowShortcutSymbol { get; private set; } = true;
         private double _originalMinHeight = 150;
+        private static System.Windows.Threading.DispatcherTimer? _memoryTimer;
+
         public MainWindow(string? id = null, BoxData? data = null)
         {
             InitializeComponent();
@@ -57,6 +60,15 @@ namespace MyDesktopOrganizer
             if (_hookID == IntPtr.Zero)
             {
                 _hookID = SetHook(_proc);
+            }
+
+            // Inicializar temporizador de memoria (solo una vez)
+            if (_memoryTimer == null)
+            {
+                _memoryTimer = new System.Windows.Threading.DispatcherTimer();
+                _memoryTimer.Interval = TimeSpan.FromSeconds(30); // Limpiar cada 30 segundos si está activo
+                _memoryTimer.Tick += (s, e) => { if (EnableGameMode) FlushMemory(); };
+                _memoryTimer.Start();
             }
 
             this.Loaded += (s, e) => {
@@ -102,6 +114,7 @@ namespace MyDesktopOrganizer
                     SetBackgroundColor(c);
                 }
             };
+            if (EnableGameMode) FlushMemory();
         }
         public static void TryLoadAppIcon(Window window)
         {
@@ -656,6 +669,21 @@ namespace MyDesktopOrganizer
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool DestroyIcon(IntPtr hIcon);
 
+        [DllImport("kernel32.dll")]
+        private static extern bool SetProcessWorkingSetSize(IntPtr process, int minimumWorkingSetSize, int maximumWorkingSetSize);
+
+        public static void FlushMemory()
+        {
+            try
+            {
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+                    SetProcessWorkingSetSize(Process.GetCurrentProcess().Handle, -1, -1);
+            }
+            catch { }
+        }
+
         private static LowLevelMouseProc _proc = HookCallback;
         private static IntPtr _hookID = IntPtr.Zero;
         private static DateTime _lastDesktopClick = DateTime.MinValue;
@@ -936,7 +964,8 @@ namespace MyDesktopOrganizer
                         ShowFileName = box.ShowFileName,
                         ShowShortcutSymbol = box.ShowShortcutSymbol,
                         IconSize = box.currentIconSize,
-                        CornerRadius = box.MainBorder.CornerRadius.TopLeft
+                        CornerRadius = box.MainBorder.CornerRadius.TopLeft,
+                        GameMode = EnableGameMode
                     });
                 }
                 string json = JsonSerializer.Serialize(list, new JsonSerializerOptions { WriteIndented = true });
@@ -966,6 +995,7 @@ namespace MyDesktopOrganizer
                         GlobalCornerRadius = first.CornerRadius >= 0 ? first.CornerRadius : GlobalCornerRadius;
                         GlobalShowFileName = first.ShowFileName;
                         GlobalShowShortcutSymbol = first.ShowShortcutSymbol;
+                        EnableGameMode = first.GameMode;
                         
                         try {
                             if (new BrushConverter().ConvertFromString(first.Color) is SolidColorBrush brush) {
@@ -1056,6 +1086,11 @@ namespace MyDesktopOrganizer
                 chkAutoStart.Checked += (s, e) => SetAutoStart(true);
                 chkAutoStart.Unchecked += (s, e) => SetAutoStart(false);
                 panel.Children.Add(chkAutoStart);
+
+                CheckBox chkGameMode = CreateCheckBox("Modo Juego (Bajo Consumo RAM)", MainWindow.EnableGameMode);
+                chkGameMode.Checked += (s, e) => { MainWindow.EnableGameMode = true; MainWindow.FlushMemory(); };
+                chkGameMode.Unchecked += (s, e) => MainWindow.EnableGameMode = false;
+                panel.Children.Add(chkGameMode);
             }));
 
             mainStack.Children.Add(CreateSection("Gestión de Cajas", panel => {
@@ -1337,6 +1372,7 @@ namespace MyDesktopOrganizer
         public bool ShowShortcutSymbol { get; set; } = true;
         public double IconSize { get; set; }
         public double CornerRadius { get; set; }
+        public bool GameMode { get; set; }
     }
 
     public class ModernMessageBox : Window
